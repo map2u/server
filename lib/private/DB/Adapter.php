@@ -3,9 +3,12 @@
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
  * @author Bart Visscher <bartv@thisnet.nl>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Joas Schilling <coding@schilljs.com>
  * @author Jonny007-MKD <1-23-4-5@web.de>
  * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Ole Ostergaard <ole.c.ostergaard@gmail.com>
+ * @author Ole Ostergaard <ole.ostergaard@knime.com>
  * @author Robin Appelman <robin@icewind.nl>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
@@ -21,7 +24,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -104,7 +107,7 @@ class Adapter {
 			. 'FROM `' . $table . '` WHERE ';
 
 		$inserts = array_values($input);
-		foreach($compare as $key) {
+		foreach ($compare as $key) {
 			$query .= '`' . $key . '`';
 			if (is_null($input[$key])) {
 				$query .= ' IS NULL AND ';
@@ -123,6 +126,19 @@ class Adapter {
 			// it's fine to ignore this then
 			//
 			// more discussions about this can be found at https://github.com/nextcloud/server/pull/12315
+			return 0;
+		}
+	}
+
+	public function insertIgnoreConflict(string $table,array $values) : int {
+		try {
+			$builder = $this->conn->getQueryBuilder();
+			$builder->insert($table);
+			foreach ($values as $key => $value) {
+				$builder->setValue($key, $builder->createNamedParameter($value));
+			}
+			return $builder->execute();
+		} catch (UniqueConstraintViolationException $e) {
 			return 0;
 		}
 	}

@@ -4,15 +4,17 @@
  * @copyright Copyright (c) 2018, Georg Ehrke
  *
  * @author Bart Visscher <bartv@thisnet.nl>
+ * @author Christoph Seitz <christoph.seitz@posteo.de>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Georg Ehrke <oc.list@georgehrke.com>
  * @author Jakob Sack <mail@jakobsack.de>
- * @author Jörn Friedrich Dreyer <jfd@butonic.de>
+ * @author Julius Härtl <jus@bitgrid.net>
  * @author Lukas Reschke <lukas@statuscode.ch>
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Roeland Jago Douma <roeland@famdouma.nl>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
- * @author Thomas Tanghus <thomas@tanghus.net>
  * @author Vincent Petry <pvince81@owncloud.com>
- * @author Georg Ehrke <oc.list@georgehrke.com>
+ * @author Vinicius Cubas Brand <vinicius@eita.org.br>
  *
  * @license AGPL-3.0
  *
@@ -26,21 +28,25 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
 namespace OCA\DAV\Connector\Sabre;
 
+use OCA\Circles\Exceptions\CircleDoesNotExistException;
+use OCA\DAV\CalDAV\Proxy\ProxyMapper;
+use OCA\DAV\Traits\PrincipalProxyTrait;
+use OCP\App\IAppManager;
+use OCP\AppFramework\QueryException;
 use OCP\IConfig;
-use OCP\IGroup;
 use OCP\IGroupManager;
 use OCP\IUser;
 use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\Share\IManager as IShareManager;
 use Sabre\DAV\Exception;
-use \Sabre\DAV\PropPatch;
+use Sabre\DAV\PropPatch;
 use Sabre\DAVACL\PrincipalBackend\BackendInterface;
 
 class Principal implements BackendInterface {
@@ -57,8 +63,8 @@ class Principal implements BackendInterface {
 	/** @var IUserSession */
 	private $userSession;
 
-	/** @var IConfig */
-	private $config;
+	/** @var IAppManager */
+	private $appManager;
 
 	/** @var string */
 	private $principalPrefix;
@@ -66,11 +72,24 @@ class Principal implements BackendInterface {
 	/** @var bool */
 	private $hasGroups;
 
+	/** @var bool */
+	private $hasCircles;
+
+	/** @var ProxyMapper */
+	private $proxyMapper;
+
+	/** @var IConfig */
+	private $config;
+
 	/**
+	 * Principal constructor.
+	 *
 	 * @param IUserManager $userManager
 	 * @param IGroupManager $groupManager
 	 * @param IShareManager $shareManager
 	 * @param IUserSession $userSession
+	 * @param IAppManager $appManager
+	 * @param ProxyMapper $proxyMapper
 	 * @param IConfig $config
 	 * @param string $principalPrefix
 	 */
@@ -78,15 +97,23 @@ class Principal implements BackendInterface {
 								IGroupManager $groupManager,
 								IShareManager $shareManager,
 								IUserSession $userSession,
+								IAppManager $appManager,
+								ProxyMapper $proxyMapper,
 								IConfig $config,
-								$principalPrefix = 'principals/users/') {
+								string $principalPrefix = 'principals/users/') {
 		$this->userManager = $userManager;
 		$this->groupManager = $groupManager;
 		$this->shareManager = $shareManager;
 		$this->userSession = $userSession;
-		$this->config = $config;
+		$this->appManager = $appManager;
 		$this->principalPrefix = trim($principalPrefix, '/');
-		$this->hasGroups = ($principalPrefix === 'principals/users/');
+		$this->hasGroups = $this->hasCircles = ($principalPrefix === 'principals/users/');
+		$this->proxyMapper = $proxyMapper;
+		$this->config = $config;
+	}
+
+	use PrincipalProxyTrait {
+		getGroupMembership as protected traitGetGroupMembership;
 	}
 
 	/**
@@ -106,7 +133,7 @@ class Principal implements BackendInterface {
 		$principals = [];
 
 		if ($prefixPath === $this->principalPrefix) {
-			foreach($this->userManager->search('') as $user) {
+			foreach ($this->userManager->search('') as $user) {
 				$principals[] = $this->userToPrincipal($user);
 			}
 		}
@@ -125,31 +152,39 @@ class Principal implements BackendInterface {
 	public function getPrincipalByPath($path) {
 		list($prefix, $name) = \Sabre\Uri\split($path);
 
+		if ($name === 'calendar-proxy-write' || $name === 'calendar-proxy-read') {
+			list($prefix2, $name2) = \Sabre\Uri\split($prefix);
+
+			if ($prefix2 === $this->principalPrefix) {
+				$user = $this->userManager->get($name2);
+
+				if ($user !== null) {
+					return [
+						'uri' => 'principals/users/' . $user->getUID() . '/' . $name,
+					];
+				}
+				return null;
+			}
+		}
+
 		if ($prefix === $this->principalPrefix) {
-			$user = $this->userManager->get($name);
+			// Depending on where it is called, it may happen that this function
+			// is called either with a urlencoded version of the name or with a non-urlencoded one.
+			// The urldecode function replaces %## and +, both of which are forbidden in usernames.
+			// Hence there can be no ambiguity here and it is safe to call urldecode on all usernames
+			$user = $this->userManager->get(urldecode($name));
 
 			if ($user !== null) {
 				return $this->userToPrincipal($user);
 			}
+		} elseif ($prefix === 'principals/circles') {
+			try {
+				return $this->circleToPrincipal($name);
+			} catch (QueryException $e) {
+				return null;
+			}
 		}
 		return null;
-	}
-
-	/**
-	 * Returns the list of members for a group-principal
-	 *
-	 * @param string $principal
-	 * @return string[]
-	 * @throws Exception
-	 */
-	public function getGroupMemberSet($principal) {
-		// TODO: for now the group principal has only one member, the user itself
-		$principal = $this->getPrincipalByPath($principal);
-		if (!$principal) {
-			throw new Exception('Principal not found');
-		}
-
-		return [$principal['uri']];
 	}
 
 	/**
@@ -163,36 +198,30 @@ class Principal implements BackendInterface {
 	public function getGroupMembership($principal, $needGroups = false) {
 		list($prefix, $name) = \Sabre\Uri\split($principal);
 
-		if ($prefix === $this->principalPrefix) {
-			$user = $this->userManager->get($name);
-			if (!$user) {
-				throw new Exception('Principal not found');
-			}
+		if ($prefix !== $this->principalPrefix) {
+			return [];
+		}
 
-			if ($this->hasGroups || $needGroups) {
-				$groups = $this->groupManager->getUserGroups($user);
-				$groups = array_map(function($group) {
-					/** @var IGroup $group */
-					return 'principals/groups/' . urlencode($group->getGID());
-				}, $groups);
+		$user = $this->userManager->get($name);
+		if (!$user) {
+			throw new Exception('Principal not found');
+		}
 
-				return $groups;
+		$groups = [];
+
+		if ($this->hasGroups || $needGroups) {
+			$userGroups = $this->groupManager->getUserGroups($user);
+			foreach ($userGroups as $userGroup) {
+				$groups[] = 'principals/groups/' . urlencode($userGroup->getGID());
 			}
 		}
-		return [];
-	}
 
-	/**
-	 * Updates the list of group members for a group principal.
-	 *
-	 * The principals should be passed as a list of uri's.
-	 *
-	 * @param string $principal
-	 * @param string[] $members
-	 * @throws Exception
-	 */
-	public function setGroupMemberSet($principal, array $members) {
-		throw new Exception('Setting members of the group is not supported yet');
+		$groups = array_unique(array_merge(
+			$groups,
+			$this->traitGetGroupMembership($principal, $needGroups)
+		));
+
+		return $groups;
 	}
 
 	/**
@@ -200,7 +229,7 @@ class Principal implements BackendInterface {
 	 * @param PropPatch $propPatch
 	 * @return int
 	 */
-	function updatePrincipal($path, PropPatch $propPatch) {
+	public function updatePrincipal($path, PropPatch $propPatch) {
 		return 0;
 	}
 
@@ -220,6 +249,9 @@ class Principal implements BackendInterface {
 			return [];
 		}
 
+		$allowEnumeration = $this->shareManager->allowEnumeration();
+		$limitEnumeration = $this->shareManager->limitEnumerationToGroups();
+
 		// If sharing is restricted to group members only,
 		// return only members that have groups in common
 		$restrictGroups = false;
@@ -232,12 +264,35 @@ class Principal implements BackendInterface {
 			$restrictGroups = $this->groupManager->getUserGroupIds($user);
 		}
 
+		$currentUserGroups = [];
+		if ($limitEnumeration) {
+			$currentUser = $this->userSession->getUser();
+			if ($currentUser) {
+				$currentUserGroups = $this->groupManager->getUserGroupIds($currentUser);
+			}
+		}
+
 		foreach ($searchProperties as $prop => $value) {
 			switch ($prop) {
 				case '{http://sabredav.org/ns}email-address':
 					$users = $this->userManager->getByEmail($value);
 
-					$results[] = array_reduce($users, function(array $carry, IUser $user) use ($restrictGroups) {
+					if (!$allowEnumeration) {
+						$users = \array_filter($users, static function (IUser $user) use ($value) {
+							return $user->getEMailAddress() === $value;
+						});
+					}
+
+					if ($limitEnumeration) {
+						$users = \array_filter($users, function (IUser $user) use ($currentUserGroups, $value) {
+							return !empty(array_intersect(
+									$this->groupManager->getUserGroupIds($user),
+									$currentUserGroups
+								)) || $user->getEMailAddress() === $value;
+						});
+					}
+
+					$results[] = array_reduce($users, function (array $carry, IUser $user) use ($restrictGroups) {
 						// is sharing restricted to groups only?
 						if ($restrictGroups !== false) {
 							$userGroups = $this->groupManager->getUserGroupIds($user);
@@ -254,7 +309,22 @@ class Principal implements BackendInterface {
 				case '{DAV:}displayname':
 					$users = $this->userManager->searchDisplayName($value);
 
-					$results[] = array_reduce($users, function(array $carry, IUser $user) use ($restrictGroups) {
+					if (!$allowEnumeration) {
+						$users = \array_filter($users, static function (IUser $user) use ($value) {
+							return $user->getDisplayName() === $value;
+						});
+					}
+
+					if ($limitEnumeration) {
+						$users = \array_filter($users, function (IUser $user) use ($currentUserGroups, $value) {
+							return !empty(array_intersect(
+									$this->groupManager->getUserGroupIds($user),
+									$currentUserGroups
+								)) || $user->getDisplayName() === $value;
+						});
+					}
+
+					$results[] = array_reduce($users, function (array $carry, IUser $user) use ($restrictGroups) {
 						// is sharing restricted to groups only?
 						if ($restrictGroups !== false) {
 							$userGroups = $this->groupManager->getUserGroupIds($user);
@@ -266,6 +336,16 @@ class Principal implements BackendInterface {
 						$carry[] = $this->principalPrefix . '/' . $user->getUID();
 						return $carry;
 					}, []);
+					break;
+
+				case '{urn:ietf:params:xml:ns:caldav}calendar-user-address-set':
+					// If you add support for more search properties that qualify as a user-address,
+					// please also add them to the array below
+					$results[] = $this->searchUserPrincipals([
+						// In theory this should also search for principal:principals/users/...
+						// but that's used internally only anyway and i don't know of any client querying that
+						'{http://sabredav.org/ns}email-address' => $value,
+					], 'anyof');
 					break;
 
 				default:
@@ -296,7 +376,7 @@ class Principal implements BackendInterface {
 	 * @param string $test
 	 * @return array
 	 */
-	function searchPrincipals($prefixPath, array $searchProperties, $test = 'allof') {
+	public function searchPrincipals($prefixPath, array $searchProperties, $test = 'allof') {
 		if (count($searchProperties) === 0) {
 			return [];
 		}
@@ -315,7 +395,7 @@ class Principal implements BackendInterface {
 	 * @param string $principalPrefix
 	 * @return string
 	 */
-	function findByUri($uri, $principalPrefix) {
+	public function findByUri($uri, $principalPrefix) {
 		// If sharing is disabled, return the empty array
 		$shareAPIEnabled = $this->shareManager->shareApiEnabled();
 		if (!$shareAPIEnabled) {
@@ -371,9 +451,9 @@ class Principal implements BackendInterface {
 		$userId = $user->getUID();
 		$displayName = $user->getDisplayName();
 		$principal = [
-				'uri' => $this->principalPrefix . '/' . $userId,
-				'{DAV:}displayname' => is_null($displayName) ? $userId : $displayName,
-				'{urn:ietf:params:xml:ns:caldav}calendar-user-type' => 'INDIVIDUAL',
+			'uri' => $this->principalPrefix . '/' . $userId,
+			'{DAV:}displayname' => is_null($displayName) ? $userId : $displayName,
+			'{urn:ietf:params:xml:ns:caldav}calendar-user-type' => 'INDIVIDUAL',
 		];
 
 		$email = $user->getEMailAddress();
@@ -388,4 +468,69 @@ class Principal implements BackendInterface {
 		return $this->principalPrefix;
 	}
 
+	/**
+	 * @param string $circleUniqueId
+	 * @return array|null
+	 * @throws \OCP\AppFramework\QueryException
+	 * @suppress PhanUndeclaredClassMethod
+	 * @suppress PhanUndeclaredClassCatch
+	 */
+	protected function circleToPrincipal($circleUniqueId) {
+		if (!$this->appManager->isEnabledForUser('circles') || !class_exists('\OCA\Circles\Api\v1\Circles')) {
+			return null;
+		}
+
+		try {
+			$circle = \OCA\Circles\Api\v1\Circles::detailsCircle($circleUniqueId, true);
+		} catch (QueryException $ex) {
+			return null;
+		} catch (CircleDoesNotExistException $ex) {
+			return null;
+		}
+
+		if (!$circle) {
+			return null;
+		}
+
+		$principal = [
+			'uri' => 'principals/circles/' . $circleUniqueId,
+			'{DAV:}displayname' => $circle->getName(),
+		];
+
+		return $principal;
+	}
+
+	/**
+	 * Returns the list of circles a principal is a member of
+	 *
+	 * @param string $principal
+	 * @return array
+	 * @throws Exception
+	 * @throws \OCP\AppFramework\QueryException
+	 * @suppress PhanUndeclaredClassMethod
+	 */
+	public function getCircleMembership($principal):array {
+		if (!$this->appManager->isEnabledForUser('circles') || !class_exists('\OCA\Circles\Api\v1\Circles')) {
+			return [];
+		}
+
+		list($prefix, $name) = \Sabre\Uri\split($principal);
+		if ($this->hasCircles && $prefix === $this->principalPrefix) {
+			$user = $this->userManager->get($name);
+			if (!$user) {
+				throw new Exception('Principal not found');
+			}
+
+			$circles = \OCA\Circles\Api\v1\Circles::joinedCircles($name, true);
+
+			$circles = array_map(function ($circle) {
+				/** @var \OCA\Circles\Model\Circle $circle */
+				return 'principals/circles/' . urlencode($circle->getUniqueId());
+			}, $circles);
+
+			return $circles;
+		}
+
+		return [];
+	}
 }

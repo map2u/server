@@ -1,8 +1,11 @@
 <?php
+
 declare(strict_types=1);
+
 /**
  * @copyright 2018, Roeland Jago Douma <roeland@famdouma.nl>
  *
+ * @author Morris Jobke <hey@morrisjobke.de>
  * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license GNU AGPL version 3 or any later version
@@ -18,7 +21,7 @@ declare(strict_types=1);
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,16 +43,16 @@ use Test\TestCase;
 
 class DirectHomeTest extends TestCase {
 
-	/** @var DirectMapper|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var DirectMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $directMapper;
 
-	/** @var IRootFolder|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IRootFolder|\PHPUnit\Framework\MockObject\MockObject */
 	private $rootFolder;
 
-	/** @var ITimeFactory|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ITimeFactory|\PHPUnit\Framework\MockObject\MockObject */
 	private $timeFactory;
 
-	/** @var Throttler|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var Throttler|\PHPUnit\Framework\MockObject\MockObject */
 	private $throttler;
 
 	/** @var IRequest */
@@ -58,7 +61,7 @@ class DirectHomeTest extends TestCase {
 	/** @var DirectHome */
 	private $directHome;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->directMapper = $this->createMock(DirectMapper::class);

@@ -2,7 +2,13 @@
 /**
  * @copyright Copyright (c) 2017 Joas Schilling <coding@schilljs.com>
  *
+ * @author Bjoern Schiessle <bjoern@schiessle.org>
+ * @author Daniel Kesselberg <mail@danielkesselberg.de>
+ * @author Georg Ehrke <oc.list@georgehrke.com>
  * @author Joas Schilling <coding@schilljs.com>
+ * @author Mario Danic <mario@lovelyhq.com>
+ * @author Robin Appelman <robin@icewind.nl>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -17,16 +23,16 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 namespace OC\Core\Migrations;
 
-use Doctrine\DBAL\Types\Type;
+use Doctrine\DBAL\Types\Types;
 use OCP\DB\ISchemaWrapper;
-use OCP\Migration\SimpleMigrationStep;
 use OCP\Migration\IOutput;
+use OCP\Migration\SimpleMigrationStep;
 
 class Version13000Date20170718121200 extends SimpleMigrationStep {
 
@@ -67,7 +73,7 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 				'notnull' => false,
 				'length' => 64,
 			]);
-			$table->addColumn('numeric_id', Type::BIGINT, [
+			$table->addColumn('numeric_id', Types::BIGINT, [
 				'autoincrement' => true,
 				'notnull' => true,
 				'length' => 20,
@@ -90,11 +96,13 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 				'notnull' => true,
 				'length' => 4,
 			]);
-			$table->addColumn('storage_id', 'integer', [
+			$table->addColumn('storage_id', Types::BIGINT, [
 				'notnull' => true,
+				'length' => 20,
 			]);
-			$table->addColumn('root_id', 'integer', [
+			$table->addColumn('root_id', Types::BIGINT, [
 				'notnull' => true,
+				'length' => 20,
 			]);
 			$table->addColumn('user_id', 'string', [
 				'notnull' => true,
@@ -104,8 +112,9 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 				'notnull' => true,
 				'length' => 4000,
 			]);
-			$table->addColumn('mount_id', 'integer', [
+			$table->addColumn('mount_id', Types::BIGINT, [
 				'notnull' => false,
+				'length' => 20,
 			]);
 			$table->setPrimaryKey(['id']);
 			$table->addIndex(['user_id'], 'mounts_user_index');
@@ -117,7 +126,7 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 
 		if (!$schema->hasTable('mimetypes')) {
 			$table = $schema->createTable('mimetypes');
-			$table->addColumn('id', Type::BIGINT, [
+			$table->addColumn('id', Types::BIGINT, [
 				'autoincrement' => true,
 				'notnull' => true,
 				'length' => 20,
@@ -133,12 +142,12 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 
 		if (!$schema->hasTable('filecache')) {
 			$table = $schema->createTable('filecache');
-			$table->addColumn('fileid', Type::BIGINT, [
+			$table->addColumn('fileid', Types::BIGINT, [
 				'autoincrement' => true,
 				'notnull' => true,
 				'length' => 20,
 			]);
-			$table->addColumn('storage', Type::BIGINT, [
+			$table->addColumn('storage', Types::BIGINT, [
 				'notnull' => true,
 				'length' => 20,
 				'default' => 0,
@@ -152,7 +161,7 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 				'length' => 32,
 				'default' => '',
 			]);
-			$table->addColumn('parent', Type::BIGINT, [
+			$table->addColumn('parent', Types::BIGINT, [
 				'notnull' => true,
 				'length' => 20,
 				'default' => 0,
@@ -161,12 +170,12 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 				'notnull' => false,
 				'length' => 250,
 			]);
-			$table->addColumn('mimetype', Type::BIGINT, [
+			$table->addColumn('mimetype', Types::BIGINT, [
 				'notnull' => true,
 				'length' => 20,
 				'default' => 0,
 			]);
-			$table->addColumn('mimepart', Type::BIGINT, [
+			$table->addColumn('mimepart', Types::BIGINT, [
 				'notnull' => true,
 				'length' => 20,
 				'default' => 0,
@@ -176,12 +185,12 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 				'length' => 8,
 				'default' => 0,
 			]);
-			$table->addColumn('mtime', Type::BIGINT, [
+			$table->addColumn('mtime', Types::BIGINT, [
 				'notnull' => true,
 				'length' => 20,
 				'default' => 0,
 			]);
-			$table->addColumn('storage_mtime', Type::BIGINT, [
+			$table->addColumn('storage_mtime', Types::BIGINT, [
 				'notnull' => true,
 				'length' => 20,
 				'default' => 0,
@@ -216,6 +225,7 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 			$table->addIndex(['storage', 'mimepart'], 'fs_storage_mimepart');
 			$table->addIndex(['storage', 'size', 'fileid'], 'fs_storage_size');
 			$table->addIndex(['mtime'], 'fs_mtime');
+			$table->addIndex(['size'], 'fs_size');
 		}
 
 		if (!$schema->hasTable('group_user')) {
@@ -310,6 +320,7 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 			]);
 			$table->setPrimaryKey(['id']);
 			$table->addIndex(['userid'], 'property_index');
+			$table->addIndex(['userid', 'propertypath'], 'properties_path_index');
 		}
 
 		if (!$schema->hasTable('share')) {
@@ -523,7 +534,7 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 			]);
 			$table->setPrimaryKey(['id']);
 			$table->addUniqueIndex(['token'], 'authtoken_token_index');
-			$table->addIndex(['last_activity'], 'authtoken_last_activity_index');
+			$table->addIndex(['last_activity'], 'authtoken_last_activity_idx');
 		}
 
 		if (!$schema->hasTable('bruteforce_attempts')) {
@@ -765,6 +776,10 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 				'length' => 64,
 				'default' => '',
 			]);
+			$table->addColumn('reference_id', 'string', [
+				'notnull' => false,
+				'length' => 64,
+			]);
 			$table->setPrimaryKey(['id']);
 			$table->addIndex(['parent_id'], 'comments_parent_id_index');
 			$table->addIndex(['topmost_parent_id'], 'comments_topmost_parent_id_idx');
@@ -920,5 +935,4 @@ class Version13000Date20170718121200 extends SimpleMigrationStep {
 		}
 		return $schema;
 	}
-
 }

@@ -328,6 +328,8 @@ Feature: provisioning
 			| accessibility |
 			| cloud_federation_api |
 			| comments |
+			| contactsinteraction |
+			| dashboard |
 			| dav |
 			| federatedfilesharing |
 			| federation |
@@ -337,13 +339,17 @@ Feature: provisioning
 			| files_versions |
 			| lookup_server_connector |
 			| provisioning_api |
+			| settings |
 			| sharebymail |
 			| systemtags |
 			| theming |
 			| twofactor_backupcodes |
 			| updatenotification |
 			| user_ldap |
+			| user_status |
+			| viewer |
 			| workflowengine |
+			| weather_status |
 			| files_external |
 			| oauth2 |
 

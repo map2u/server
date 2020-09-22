@@ -2,9 +2,11 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Lukas Reschke <lukas@statuscode.ch>
  * @author Markus Goetz <markus@woboq.com>
  * @author Robin Appelman <robin@icewind.nl>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  * @author Vincent Petry <pvince81@owncloud.com>
  *
@@ -20,7 +22,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -71,7 +73,7 @@ class AssemblyStream implements \Icewind\Streams\File {
 		$this->loadContext('assembly');
 
 		$nodes = $this->nodes;
-		// http://stackoverflow.com/a/10985500
+		// https://stackoverflow.com/a/10985500
 		@usort($nodes, function (IFile $a, IFile $b) {
 			return strnatcmp($a->getName(), $b->getName());
 		});
@@ -83,12 +85,46 @@ class AssemblyStream implements \Icewind\Streams\File {
 	}
 
 	/**
-	 * @param string $offset
+	 * @param int $offset
 	 * @param int $whence
 	 * @return bool
 	 */
 	public function stream_seek($offset, $whence = SEEK_SET) {
-		return false;
+		if ($whence === SEEK_CUR) {
+			$offset = $this->stream_tell() + $offset;
+		} elseif ($whence === SEEK_END) {
+			$offset = $this->size + $offset;
+		}
+
+		if ($offset > $this->size) {
+			return false;
+		}
+
+		$nodeIndex = 0;
+		$nodeStart = 0;
+		while (true) {
+			if (!isset($this->nodes[$nodeIndex + 1])) {
+				break;
+			}
+			$node = $this->nodes[$nodeIndex];
+			if ($nodeStart + $node->getSize() > $offset) {
+				break;
+			}
+			$nodeIndex++;
+			$nodeStart += $node->getSize();
+		}
+
+		$stream = $this->getStream($this->nodes[$nodeIndex]);
+		$nodeOffset = $offset - $nodeStart;
+		if (fseek($stream, $nodeOffset) === -1) {
+			return false;
+		}
+		$this->currentNode = $nodeIndex;
+		$this->currentNodeRead = $nodeOffset;
+		$this->currentStream = $stream;
+		$this->pos = $offset;
+
+		return true;
 	}
 
 	/**
@@ -210,7 +246,7 @@ class AssemblyStream implements \Icewind\Streams\File {
 	 *
 	 * @param string $name
 	 * @return array
-	 * @throws \Exception
+	 * @throws \BadMethodCallException
 	 */
 	protected function loadContext($name) {
 		$context = stream_context_get_options($this->context);

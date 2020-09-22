@@ -21,9 +21,7 @@
  *
  */
 
-
 namespace Test\AppFramework\Db;
-
 
 /**
  * Simple utility class for testing mappers
@@ -41,7 +39,7 @@ abstract class MapperTestUtility extends \Test\TestCase {
 	 * Run this function before the actual test to either set or initialize the
 	 * db. After this the db can be accessed by using $this->db
 	 */
-	protected function setUp(){
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->db = $this->getMockBuilder(
@@ -90,26 +88,26 @@ abstract class MapperTestUtility extends \Test\TestCase {
 	 * of the database query. If not provided, it wont be assumed that fetch
 	 * will be called on the result
 	 */
-	protected function setMapperResult($sql, $arguments=array(), $returnRows=array(),
-		$limit=null, $offset=null, $expectClose=false){
-		if($limit === null && $offset === null) {
+	protected function setMapperResult($sql, $arguments=[], $returnRows=[],
+		$limit=null, $offset=null, $expectClose=false) {
+		if ($limit === null && $offset === null) {
 			$this->db->expects($this->at($this->prepareAt))
 				->method('prepare')
 				->with($this->equalTo($sql))
 				->will(($this->returnValue($this->query)));
-		} elseif($limit !== null && $offset === null) {
+		} elseif ($limit !== null && $offset === null) {
 			$this->db->expects($this->at($this->prepareAt))
 				->method('prepare')
 				->with($this->equalTo($sql), $this->equalTo($limit))
 				->will(($this->returnValue($this->query)));
-		} elseif($limit === null && $offset !== null) {
+		} elseif ($limit === null && $offset !== null) {
 			$this->db->expects($this->at($this->prepareAt))
 				->method('prepare')
 				->with($this->equalTo($sql),
 					$this->equalTo(null),
 					$this->equalTo($offset))
 				->will(($this->returnValue($this->query)));
-		} else  {
+		} else {
 			$this->db->expects($this->at($this->prepareAt))
 				->method('prepare')
 				->with($this->equalTo($sql),
@@ -125,12 +123,12 @@ abstract class MapperTestUtility extends \Test\TestCase {
 
 		$this->query->expects($this->any())
 			->method('fetch')
-			->will($this->returnCallback(
-				function() use ($iterators, $fetchAt){
+			->willReturnCallback(
+				function () use ($iterators, $fetchAt) {
 					$iterator = $iterators[$fetchAt];
 					$result = $iterator->next();
 
-					if($result === false) {
+					if ($result === false) {
 						$fetchAt++;
 					}
 
@@ -138,10 +136,10 @@ abstract class MapperTestUtility extends \Test\TestCase {
 
 					return $result;
 				}
-			));
+			);
 
 		if ($this->isAssocArray($arguments)) {
-			foreach($arguments as $key => $argument) {
+			foreach ($arguments as $key => $argument) {
 				$pdoConstant = $this->getPDOType($argument);
 				$this->query->expects($this->at($this->queryAt))
 					->method('bindValue')
@@ -152,7 +150,7 @@ abstract class MapperTestUtility extends \Test\TestCase {
 			}
 		} else {
 			$index = 1;
-			foreach($arguments as $argument) {
+			foreach ($arguments as $argument) {
 				$pdoConstant = $this->getPDOType($argument);
 				$this->query->expects($this->at($this->queryAt))
 					->method('bindValue')
@@ -166,9 +164,8 @@ abstract class MapperTestUtility extends \Test\TestCase {
 
 		$this->query->expects($this->at($this->queryAt))
 			->method('execute')
-			->will($this->returnCallback(function($sql, $p=null, $o=null, $s=null) {
-
-			}));
+			->willReturnCallback(function ($sql, $p=null, $o=null, $s=null) {
+			});
 		$this->queryAt++;
 
 
@@ -184,26 +181,22 @@ abstract class MapperTestUtility extends \Test\TestCase {
 		$this->prepareAt++;
 		$this->fetchAt++;
 	}
-
-
 }
 
 
 class ArgumentIterator {
-
 	private $arguments;
 
-	public function __construct($arguments){
+	public function __construct($arguments) {
 		$this->arguments = $arguments;
 	}
 
-	public function next(){
+	public function next() {
 		$result = array_shift($this->arguments);
-		if($result === null){
+		if ($result === null) {
 			return false;
 		} else {
 			return $result;
 		}
 	}
 }
-

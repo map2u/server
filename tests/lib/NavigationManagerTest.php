@@ -12,6 +12,10 @@
 
 namespace Test;
 
+use OC\App\AppManager;
+use OC\Group\Manager;
+use OC\NavigationManager;
+use OC\SubAdmin;
 use OCP\IConfig;
 use OCP\IGroupManager;
 use OCP\IL10N;
@@ -19,29 +23,25 @@ use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserSession;
 use OCP\L10N\IFactory;
-use OC\App\AppManager;
-use OC\Group\Manager;
-use OC\NavigationManager;
-use OC\SubAdmin;
 
 class NavigationManagerTest extends TestCase {
-	/** @var AppManager|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var AppManager|\PHPUnit\Framework\MockObject\MockObject */
 	protected $appManager;
-	/** @var IURLGenerator|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IURLGenerator|\PHPUnit\Framework\MockObject\MockObject */
 	protected $urlGenerator;
-	/** @var IFactory|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IFactory|\PHPUnit\Framework\MockObject\MockObject */
 	protected $l10nFac;
-	/** @var IUserSession|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IUserSession|\PHPUnit\Framework\MockObject\MockObject */
 	protected $userSession;
-	/** @var IGroupManager|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IGroupManager|\PHPUnit\Framework\MockObject\MockObject */
 	protected $groupManager;
-	/** @var IConfig|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
 	protected $config;
 
 	/** @var \OC\NavigationManager */
 	protected $navigationManager;
 
-	protected function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->appManager        = $this->createMock(AppManager::class);
@@ -206,7 +206,6 @@ class NavigationManagerTest extends TestCase {
 	 * @dataProvider providesNavigationConfig
 	 */
 	public function testWithAppManager($expected, $navigation, $isAdmin = false) {
-
 		$l = $this->createMock(IL10N::class);
 		$l->expects($this->any())->method('t')->willReturnCallback(function ($text, $parameters = []) {
 			return vsprintf($text, $parameters);
@@ -217,27 +216,20 @@ class NavigationManagerTest extends TestCase {
 		$this->urlGenerator->expects($this->any())->method('imagePath')->willReturnCallback(function ($appName, $file) {
 			return "/apps/$appName/img/$file";
 		});
-		$this->urlGenerator->expects($this->any())->method('linkToRoute')->willReturnCallback(function () {
+		$this->urlGenerator->expects($this->any())->method('linkToRoute')->willReturnCallback(function ($route) {
+			if ($route === 'core.login.logout') {
+				return 'https://example.com/logout';
+			}
 			return '/apps/test/';
 		});
-		$this->urlGenerator
-		     ->expects($this->once())
-		     ->method('linkToRouteAbsolute')
-		     ->with(
-			     'core.login.logout',
-			     [
-				     'requesttoken' => \OCP\Util::callRegister()
-			     ]
-		     )
-		     ->willReturn('https://example.com/logout');
 		$user = $this->createMock(IUser::class);
 		$user->expects($this->any())->method('getUID')->willReturn('user001');
 		$this->userSession->expects($this->any())->method('getUser')->willReturn($user);
 		$this->userSession->expects($this->any())->method('isLoggedIn')->willReturn(true);
 		$this->appManager->expects($this->once())
-		     ->method('getEnabledAppsForUser')
-		     ->with($user)
-		     ->willReturn(['test']);
+			 ->method('getEnabledAppsForUser')
+			 ->with($user)
+			 ->willReturn(['test']);
 		$this->groupManager->expects($this->any())->method('isAdmin')->willReturn($isAdmin);
 		$subadmin = $this->createMock(SubAdmin::class);
 		$subadmin->expects($this->any())->method('isSubAdmin')->with($user)->willReturn(false);
@@ -252,7 +244,7 @@ class NavigationManagerTest extends TestCase {
 		$apps = [
 			'core_apps' => [
 				'id'      => 'core_apps',
-				'order'   => 3,
+				'order'   => 4,
 				'href'    => '/apps/test/',
 				'icon'    => '/apps/settings/img/apps.svg',
 				'name'    => 'Apps',
@@ -264,7 +256,7 @@ class NavigationManagerTest extends TestCase {
 		$defaults = [
 			'settings' => [
 				'id'      => 'settings',
-				'order'   => 1,
+				'order'   => 2,
 				'href'    => '/apps/test/',
 				'icon'    => '/apps/settings/img/admin.svg',
 				'name'    => 'Settings',
@@ -275,7 +267,7 @@ class NavigationManagerTest extends TestCase {
 			'logout' => [
 				'id'      => 'logout',
 				'order'   => 99999,
-				'href'    => 'https://example.com/logout',
+				'href'    => 'https://example.com/logout?requesttoken='. urlencode(\OCP\Util::callRegister()),
 				'icon'    => '/apps/core/img/actions/logout.svg',
 				'name'    => 'Log out',
 				'active'  => false,
@@ -301,7 +293,9 @@ class NavigationManagerTest extends TestCase {
 					['logout' => $defaults['logout']]
 				),
 				['navigations' => [
-					['route' => 'test.page.index', 'name' => 'Test']
+					'navigation' => [
+						['route' => 'test.page.index', 'name' => 'Test']
+					]
 				]]
 			],
 			'minimalistic-settings' => [
@@ -320,9 +314,11 @@ class NavigationManagerTest extends TestCase {
 					['logout' => $defaults['logout']]
 				),
 				['navigations' => [
-					['route' => 'test.page.index', 'name' => 'Test', 'type' => 'settings']
-				]
-				]],
+					'navigation' => [
+						['route' => 'test.page.index', 'name' => 'Test', 'type' => 'settings']
+					],
+				]]
+			],
 			'admin' => [
 				array_merge(
 					['settings' => $defaults['settings']],
@@ -340,7 +336,9 @@ class NavigationManagerTest extends TestCase {
 					['logout' => $defaults['logout']]
 				),
 				['navigations' => [
-					['@attributes' => ['role' => 'admin'], 'route' => 'test.page.index', 'name' => 'Test']
+					'navigation' => [
+						['@attributes' => ['role' => 'admin'], 'route' => 'test.page.index', 'name' => 'Test']
+					],
 				]],
 				true
 			],
@@ -351,7 +349,9 @@ class NavigationManagerTest extends TestCase {
 					['logout' => $defaults['logout']]
 				),
 				['navigations' => [
-					['@attributes' => ['role' => 'admin'], 'route' => 'test.page.index']
+					'navigation' => [
+						['@attributes' => ['role' => 'admin'], 'route' => 'test.page.index']
+					],
 				]],
 				true
 			],

@@ -4,7 +4,9 @@
  *
  * @author Bjoern Schiessle <bjoern@schiessle.org>
  * @author Björn Schießle <bjoern@schiessle.org>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Lukas Reschke <lukas@statuscode.ch>
+ * @author Morris Jobke <hey@morrisjobke.de>
  *
  * @license AGPL-3.0
  *
@@ -18,22 +20,23 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
-
 namespace OCA\FederatedFileSharing;
 
+use OCA\FederatedFileSharing\Events\FederatedShareAddedEvent;
 use OCP\AppFramework\Http;
 use OCP\BackgroundJob\IJobList;
+use OCP\EventDispatcher\IEventDispatcher;
 use OCP\Federation\ICloudFederationFactory;
 use OCP\Federation\ICloudFederationProviderManager;
 use OCP\Http\Client\IClientService;
 use OCP\OCS\IDiscoveryService;
 
 class Notifications {
-	const RESPONSE_FORMAT = 'json'; // default response format for ocs calls
+	public const RESPONSE_FORMAT = 'json'; // default response format for ocs calls
 
 	/** @var AddressHandler */
 	private $addressHandler;
@@ -53,21 +56,17 @@ class Notifications {
 	/** @var ICloudFederationFactory */
 	private $cloudFederationFactory;
 
-	/**
-	 * @param AddressHandler $addressHandler
-	 * @param IClientService $httpClientService
-	 * @param IDiscoveryService $discoveryService
-	 * @param IJobList $jobList
-	 * @param ICloudFederationProviderManager $federationProviderManager
-	 * @param ICloudFederationFactory $cloudFederationFactory
-	 */
+	/** @var IEventDispatcher */
+	private $eventDispatcher;
+
 	public function __construct(
 		AddressHandler $addressHandler,
 		IClientService $httpClientService,
 		IDiscoveryService $discoveryService,
 		IJobList $jobList,
 		ICloudFederationProviderManager $federationProviderManager,
-		ICloudFederationFactory $cloudFederationFactory
+		ICloudFederationFactory $cloudFederationFactory,
+		IEventDispatcher $eventDispatcher
 	) {
 		$this->addressHandler = $addressHandler;
 		$this->httpClientService = $httpClientService;
@@ -75,6 +74,7 @@ class Notifications {
 		$this->jobList = $jobList;
 		$this->federationProviderManager = $federationProviderManager;
 		$this->cloudFederationFactory = $cloudFederationFactory;
+		$this->eventDispatcher = $eventDispatcher;
 	}
 
 	/**
@@ -94,13 +94,12 @@ class Notifications {
 	 * @throws \OC\ServerNotAvailableException
 	 */
 	public function sendRemoteShare($token, $shareWith, $name, $remote_id, $owner, $ownerFederatedId, $sharedBy, $sharedByFederatedId, $shareType) {
-
 		list($user, $remote) = $this->addressHandler->splitUserRemote($shareWith);
 
 		if ($user && $remote) {
 			$local = $this->addressHandler->generateRemoteURL();
 
-			$fields = array(
+			$fields = [
 				'shareWith' => $user,
 				'token' => $token,
 				'name' => $name,
@@ -111,7 +110,7 @@ class Notifications {
 				'sharedByFederatedId' => $sharedByFederatedId,
 				'remote' => $local,
 				'shareType' => $shareType
-			);
+			];
 
 			$result = $this->tryHttpPostToShareEndpoint($remote, '', $fields);
 			$status = json_decode($result['result'], true);
@@ -120,10 +119,10 @@ class Notifications {
 			$ocsSuccess = $ocsStatus && ($status['ocs']['meta']['statuscode'] === 100 || $status['ocs']['meta']['statuscode'] === 200);
 
 			if ($result['success'] && (!$ocsStatus ||$ocsSuccess)) {
-				\OC_Hook::emit('OCP\Share', 'federated_share_added', ['server' => $remote]);
+				$event = new FederatedShareAddedEvent($remote);
+				$this->eventDispatcher->dispatchTyped($event);
 				return true;
 			}
-
 		}
 
 		return false;
@@ -144,13 +143,12 @@ class Notifications {
 	 * @throws \OC\ServerNotAvailableException
 	 */
 	public function requestReShare($token, $id, $shareId, $remote, $shareWith, $permission, $filename) {
-
-		$fields = array(
+		$fields = [
 			'shareWith' => $shareWith,
 			'token' => $token,
 			'permission' => $permission,
 			'remoteId' => $shareId,
-		);
+		];
 
 		$ocmFields = $fields;
 		$ocmFields['remoteId'] = $id;
@@ -251,11 +249,10 @@ class Notifications {
 	 * @return boolean
 	 */
 	public function sendUpdateToRemote($remote, $remoteId, $token, $action, $data = [], $try = 0) {
-
 		$fields = [
 			'token' => $token,
 			'remoteId' => $remoteId
-			];
+		];
 		foreach ($data as $key => $value) {
 			$fields[$key] = $value;
 		}
@@ -309,7 +306,6 @@ class Notifications {
 	 * @throws \Exception
 	 */
 	protected function tryHttpPostToShareEndpoint($remoteDomain, $urlSuffix, array $fields, $action="share") {
-
 		if ($this->addressHandler->urlContainProtocol($remoteDomain) === false) {
 			$remoteDomain = 'https://' . $remoteDomain;
 		}
@@ -341,7 +337,6 @@ class Notifications {
 	 * @throws \Exception
 	 */
 	protected function tryLegacyEndPoint($remoteDomain, $urlSuffix, array $fields) {
-
 		$result = [
 			'success' => false,
 			'result' => '',
@@ -369,7 +364,6 @@ class Notifications {
 		}
 
 		return $result;
-
 	}
 
 	/**
@@ -440,6 +434,5 @@ class Notifications {
 		}
 
 		return false;
-
 	}
 }

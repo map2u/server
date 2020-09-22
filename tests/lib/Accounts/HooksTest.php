@@ -19,9 +19,7 @@
  *
  */
 
-
 namespace Test\Accounts;
-
 
 use OC\Accounts\AccountManager;
 use OC\Accounts\Hooks;
@@ -35,18 +33,18 @@ use Test\TestCase;
  * @package Test\Accounts
  * @group DB
  */
-class HooksTest extends TestCase  {
+class HooksTest extends TestCase {
 
-	/** @var  ILogger | \PHPUnit_Framework_MockObject_MockObject */
+	/** @var  ILogger | \PHPUnit\Framework\MockObject\MockObject */
 	private $logger;
 
-	/** @var  AccountManager | \PHPUnit_Framework_MockObject_MockObject */
+	/** @var  AccountManager | \PHPUnit\Framework\MockObject\MockObject */
 	private $accountManager;
 
-	/** @var  Hooks | \PHPUnit_Framework_MockObject_MockObject */
+	/** @var  Hooks | \PHPUnit\Framework\MockObject\MockObject */
 	private $hooks;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->logger = $this->createMock(ILogger::class);
@@ -91,7 +89,6 @@ class HooksTest extends TestCase  {
 		}
 
 		$this->hooks->changeUserHook($params);
-
 	}
 
 	public function dataTestChangeUserHook() {
@@ -153,5 +150,4 @@ class HooksTest extends TestCase  {
 		$result = $this->invokePrivate($hooks, 'getAccountManager');
 		$this->assertInstanceOf(AccountManager::class, $result);
 	}
-
 }

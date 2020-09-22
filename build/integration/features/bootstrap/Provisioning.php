@@ -2,8 +2,12 @@
 /**
  *
  *
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Daniel Calviño Sánchez <danxuliu@gmail.com>
  * @author Joas Schilling <coding@schilljs.com>
+ * @author John Molakvoæ (skjnldsv) <skjnldsv@protonmail.com>
  * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Robin Appelman <robin@icewind.nl>
  * @author Roeland Jago Douma <roeland@famdouma.nl>
  * @author Sergio Bertolin <sbertolin@solidgear.es>
  * @author Sergio Bertolín <sbertolin@solidgear.es>
@@ -23,7 +27,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -66,6 +70,23 @@ trait Provisioning {
 	}
 
 	/**
+	 * @Given /^user "([^"]*)" with displayname "([^"]*)" exists$/
+	 * @param string $user
+	 */
+	public function assureUserWithDisplaynameExists($user, $displayname) {
+		try {
+			$this->userExists($user);
+		} catch (\GuzzleHttp\Exception\ClientException $ex) {
+			$previous_user = $this->currentUser;
+			$this->currentUser = "admin";
+			$this->creatingTheUser($user, $displayname);
+			$this->currentUser = $previous_user;
+		}
+		$this->userExists($user);
+		Assert::assertEquals(200, $this->response->getStatusCode());
+	}
+
+	/**
 	 * @Given /^user "([^"]*)" does not exist$/
 	 * @param string $user
 	 */
@@ -89,7 +110,7 @@ trait Provisioning {
 		}
 	}
 
-	public function creatingTheUser($user) {
+	public function creatingTheUser($user, $displayname = '') {
 		$fullUrl = $this->baseUrl . "v{$this->apiVersion}.php/cloud/users";
 		$client = new Client();
 		$options = [];
@@ -101,6 +122,9 @@ trait Provisioning {
 			'userid' => $user,
 			'password' => '123456'
 		];
+		if ($displayname !== '') {
+			$options['form_params']['displayName'] = $displayname;
+		}
 		$options['headers'] = [
 			'OCS-APIREQUEST' => 'true',
 		];
@@ -271,7 +295,7 @@ trait Provisioning {
 		];
 
 		$this->response = $client->get($fullUrl, $options);
-		$groups = array($group);
+		$groups = [$group];
 		$respondedArray = $this->getArrayOfGroupsResponded($this->response);
 		Assert::assertNotEquals($groups, $respondedArray, "", 0.0, 10, true);
 		Assert::assertEquals(200, $this->response->getStatusCode());
@@ -376,7 +400,6 @@ trait Provisioning {
 		$this->userExists($user);
 		$this->groupExists($group);
 		$this->addingUserToGroup($user, $group);
-
 	}
 
 	/**
@@ -535,7 +558,20 @@ trait Provisioning {
 			$respondedArray = $this->getArrayOfUsersResponded($this->response);
 			Assert::assertEquals($usersSimplified, $respondedArray, "", 0.0, 10, true);
 		}
+	}
 
+	/**
+	 * @Then /^detailed users returned are$/
+	 * @param \Behat\Gherkin\Node\TableNode|null $usersList
+	 */
+	public function theDetailedUsersShouldBe($usersList) {
+		if ($usersList instanceof \Behat\Gherkin\Node\TableNode) {
+			$users = $usersList->getRows();
+			$usersSimplified = $this->simplifyArray($users);
+			$respondedArray = $this->getArrayOfDetailedUsersResponded($this->response);
+			$respondedArray = array_keys($respondedArray);
+			Assert::assertEquals($usersSimplified, $respondedArray);
+		}
 	}
 
 	/**
@@ -549,7 +585,6 @@ trait Provisioning {
 			$respondedArray = $this->getArrayOfGroupsResponded($this->response);
 			Assert::assertEquals($groupsSimplified, $respondedArray, "", 0.0, 10, true);
 		}
-
 	}
 
 	/**
@@ -563,7 +598,6 @@ trait Provisioning {
 			$respondedArray = $this->getArrayOfSubadminsResponded($this->response);
 			Assert::assertEquals($groupsSimplified, $respondedArray, "", 0.0, 10, true);
 		}
-
 	}
 
 	/**
@@ -577,7 +611,6 @@ trait Provisioning {
 			$respondedArray = $this->getArrayOfAppsResponded($this->response);
 			Assert::assertEquals($appsSimplified, $respondedArray, "", 0.0, 10, true);
 		}
-
 	}
 
 	/**
@@ -596,6 +629,18 @@ trait Provisioning {
 	 */
 	public function getArrayOfUsersResponded($resp) {
 		$listCheckedElements = simplexml_load_string($resp->getBody())->data[0]->users[0]->element;
+		$extractedElementsArray = json_decode(json_encode($listCheckedElements), 1);
+		return $extractedElementsArray;
+	}
+
+	/**
+	 * Parses the xml answer to get the array of detailed users returned.
+	 *
+	 * @param ResponseInterface $resp
+	 * @return array
+	 */
+	public function getArrayOfDetailedUsersResponded($resp) {
+		$listCheckedElements = simplexml_load_string($resp->getBody())->data[0]->users;
 		$extractedElementsArray = json_decode(json_encode($listCheckedElements), 1);
 		return $extractedElementsArray;
 	}
@@ -813,5 +858,4 @@ trait Provisioning {
 		}
 		$this->usingServer($previousServer);
 	}
-
 }

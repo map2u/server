@@ -20,7 +20,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -32,7 +32,6 @@ use OCA\Files_External\Lib\DefinitionParameter;
 use OCA\Files_External\Lib\StorageConfig;
 
 class StorageConfigTest extends \Test\TestCase {
-
 	public function testJsonSerialization() {
 		$backend = $this->getMockBuilder(Backend::class)
 			->disableOriginalConstructor()
@@ -81,5 +80,4 @@ class StorageConfigTest extends \Test\TestCase {
 		$this->assertSame(['group1', 'group2'], $json['applicableGroups']);
 		$this->assertSame(['preview' => false], $json['mountOptions']);
 	}
-
 }

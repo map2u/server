@@ -8,6 +8,7 @@
  */
 
 namespace Test;
+
 use OCP\IConfig;
 
 /**
@@ -26,7 +27,7 @@ class AppConfigTest extends TestCase {
 
 	protected $originalConfig;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->connection = \OC::$server->getDatabaseConnection();
@@ -111,7 +112,7 @@ class AppConfigTest extends TestCase {
 		])->execute();
 	}
 
-	public function tearDown() {
+	protected function tearDown(): void {
 		$sql = $this->connection->getQueryBuilder();
 		$sql->delete('appconfig');
 		$sql->execute();
@@ -307,7 +308,7 @@ class AppConfigTest extends TestCase {
 	}
 
 	public function testGetFilteredValues() {
-		/** @var \OC\AppConfig|\PHPUnit_Framework_MockObject_MockObject $config */
+		/** @var \OC\AppConfig|\PHPUnit\Framework\MockObject\MockObject $config */
 		$config = $this->getMockBuilder(\OC\AppConfig::class)
 			->setConstructorArgs([\OC::$server->getDatabaseConnection()])
 			->setMethods(['getValues'])
@@ -318,12 +319,14 @@ class AppConfigTest extends TestCase {
 			->with('user_ldap', false)
 			->willReturn([
 				'ldap_agent_password' => 'secret',
+				's42ldap_agent_password' => 'secret',
 				'ldap_dn' => 'dn',
 			]);
 
 		$values = $config->getFilteredValues('user_ldap');
 		$this->assertEquals([
 			'ldap_agent_password' => IConfig::SENSITIVE_VALUE,
+			's42ldap_agent_password' => IConfig::SENSITIVE_VALUE,
 			'ldap_dn' => 'dn',
 		], $values);
 	}

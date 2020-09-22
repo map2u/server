@@ -2,6 +2,8 @@
 /**
  * @copyright Copyright (c) 2018 Bjoern Schiessle <bjoern@schiessle.org>
  *
+ * @author Bjoern Schiessle <bjoern@schiessle.org>
+ *
  * @license GNU AGPL version 3 or any later version
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,10 +17,9 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
 
 namespace OC\Federation;
 
@@ -95,7 +96,6 @@ class CloudFederationProviderManager implements ICloudFederationProviderManager 
 			'displayName' => $displayName,
 			'callback' => $callback,
 		];
-
 	}
 
 	/**
@@ -134,7 +134,6 @@ class CloudFederationProviderManager implements ICloudFederationProviderManager 
 	public function sendShare(ICloudFederationShare $share) {
 		$cloudID = $this->cloudIdManager->resolveCloudId($share->getShareWith());
 		$ocmEndPoint = $this->getOCMEndPoint($cloudID->getRemote());
-
 		if (empty($ocmEndPoint)) {
 			return false;
 		}
@@ -142,7 +141,8 @@ class CloudFederationProviderManager implements ICloudFederationProviderManager 
 		$client = $this->httpClientService->newClient();
 		try {
 			$response = $client->post($ocmEndPoint . '/shares', [
-				'body' => $share->getShare(),
+				'body' => json_encode($share->getShare()),
+				'headers' => ['content-type' => 'application/json'],
 				'timeout' => 10,
 				'connect_timeout' => 10,
 			]);
@@ -151,7 +151,6 @@ class CloudFederationProviderManager implements ICloudFederationProviderManager 
 				$result = json_decode($response->getBody(), true);
 				return (is_array($result)) ? $result : [];
 			}
-
 		} catch (\Exception $e) {
 			// if flat re-sharing is not supported by the remote server
 			// we re-throw the exception and fall back to the old behaviour.
@@ -163,7 +162,6 @@ class CloudFederationProviderManager implements ICloudFederationProviderManager 
 		}
 
 		return false;
-
 	}
 
 	/**
@@ -181,7 +179,8 @@ class CloudFederationProviderManager implements ICloudFederationProviderManager 
 		$client = $this->httpClientService->newClient();
 		try {
 			$response = $client->post($ocmEndPoint . '/notifications', [
-				'body' => $notification->getMessage(),
+				'body' => json_encode($notification->getMessage()),
+				'headers' => ['content-type' => 'application/json'],
 				'timeout' => 10,
 				'connect_timeout' => 10,
 			]);
@@ -212,7 +211,6 @@ class CloudFederationProviderManager implements ICloudFederationProviderManager 
 	 * @return string
 	 */
 	protected function getOCMEndPoint($url) {
-
 		if (isset($this->ocmEndPoints[$url])) {
 			return $this->ocmEndPoints[$url];
 		}
@@ -238,6 +236,4 @@ class CloudFederationProviderManager implements ICloudFederationProviderManager 
 		$this->ocmEndPoints[$url] = '';
 		return '';
 	}
-
-
 }

@@ -22,7 +22,6 @@
 
 namespace Test\Authentication\TwoFactorAuth;
 
-use Exception;
 use OC;
 use OC\Authentication\Token\IProvider as TokenProvider;
 use OC\Authentication\TwoFactorAuth\Manager;
@@ -31,6 +30,7 @@ use OC\Authentication\TwoFactorAuth\ProviderLoader;
 use OCP\Activity\IEvent;
 use OCP\Activity\IManager;
 use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Authentication\TwoFactorAuth\IActivatableAtLogin;
 use OCP\Authentication\TwoFactorAuth\IProvider;
 use OCP\Authentication\TwoFactorAuth\IRegistry;
 use OCP\IConfig;
@@ -38,6 +38,7 @@ use OCP\ILogger;
 use OCP\ISession;
 use OCP\IUser;
 use PHPUnit\Framework\MockObject\MockObject;
+use function reset;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Test\TestCase;
 
@@ -85,7 +86,7 @@ class ManagerTest extends TestCase {
 	/** @var EventDispatcherInterface|MockObject */
 	private $eventDispatcher;
 
-	protected function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->user = $this->createMock(IUser::class);
@@ -124,7 +125,7 @@ class ManagerTest extends TestCase {
 	private function prepareNoProviders() {
 		$this->providerLoader->method('getProviders')
 			->with($this->user)
-			->will($this->returnValue([]));
+			->willReturn([]);
 	}
 
 	private function prepareProviders() {
@@ -297,6 +298,23 @@ class ManagerTest extends TestCase {
 		$this->assertNull($provider);
 	}
 
+	public function testGetLoginSetupProviders() {
+		$provider1 = $this->createMock(IProvider::class);
+		$provider2 = $this->createMock(IActivatableAtLogin::class);
+		$this->providerLoader->expects($this->once())
+			->method('getProviders')
+			->with($this->user)
+			->willReturn([
+				$provider1,
+				$provider2,
+			]);
+
+		$providers = $this->manager->getLoginSetupProviders($this->user);
+
+		$this->assertCount(1, $providers);
+		$this->assertSame($provider2, reset($providers));
+	}
+
 	public function testGetProviders() {
 		$this->providerRegistry->expects($this->once())
 			->method('getProviderStates')
@@ -347,11 +365,11 @@ class ManagerTest extends TestCase {
 		$this->fakeProvider->expects($this->once())
 			->method('verifyChallenge')
 			->with($this->user, $challenge)
-			->will($this->returnValue(true));
+			->willReturn(true);
 		$this->session->expects($this->once())
 			->method('get')
 			->with('two_factor_remember_login')
-			->will($this->returnValue(false));
+			->willReturn(false);
 		$this->session->expects($this->at(1))
 			->method('remove')
 			->with('two_factor_auth_uid');
@@ -430,7 +448,7 @@ class ManagerTest extends TestCase {
 		$this->fakeProvider->expects($this->once())
 			->method('verifyChallenge')
 			->with($this->user, $challenge)
-			->will($this->returnValue(false));
+			->willReturn(false);
 		$this->session->expects($this->never())
 			->method('remove');
 		$this->activityManager->expects($this->once())
@@ -477,7 +495,7 @@ class ManagerTest extends TestCase {
 		$this->session->expects($this->at(1))
 			->method('exists')
 			->with('two_factor_auth_uid')
-			->will($this->returnValue(false));
+			->willReturn(false);
 		$this->session->expects($this->at(2))
 			->method('exists')
 			->with(Manager::SESSION_UID_DONE)
@@ -538,7 +556,7 @@ class ManagerTest extends TestCase {
 		$this->session->expects($this->never())
 			->method('exists')
 			->with('two_factor_auth_uid')
-			->will($this->returnValue(true));
+			->willReturn(true);
 		$this->session->expects($this->never())
 			->method('remove')
 			->with('two_factor_auth_uid');
@@ -548,7 +566,7 @@ class ManagerTest extends TestCase {
 
 	public function testPrepareTwoFactorLogin() {
 		$this->user->method('getUID')
-			->will($this->returnValue('ferdinand'));
+			->willReturn('ferdinand');
 
 		$this->session->expects($this->at(0))
 			->method('set')
@@ -578,7 +596,7 @@ class ManagerTest extends TestCase {
 
 	public function testPrepareTwoFactorLoginDontRemember() {
 		$this->user->method('getUID')
-			->will($this->returnValue('ferdinand'));
+			->willReturn('ferdinand');
 
 		$this->session->expects($this->at(0))
 			->method('set')
@@ -611,14 +629,14 @@ class ManagerTest extends TestCase {
 			->willReturn('user');
 
 		$this->session->method('exists')
-			->will($this->returnCallback(function ($var) {
+			->willReturnCallback(function ($var) {
 				if ($var === Manager::SESSION_UID_KEY) {
 					return false;
-				} else if ($var === 'app_password') {
+				} elseif ($var === 'app_password') {
 					return false;
 				}
 				return true;
-			}));
+			});
 		$this->session->expects($this->once())
 			->method('get')
 			->with(Manager::SESSION_UID_DONE)

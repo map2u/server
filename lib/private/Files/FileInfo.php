@@ -2,7 +2,7 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
- * @author 1 Man Projects <reed@1manprojects.de>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Joas Schilling <coding@schilljs.com>
  * @author Julius Härtl <jus@bitgrid.net>
  * @author Lukas Reschke <lukas@statuscode.ch>
@@ -27,7 +27,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -81,6 +81,13 @@ class FileInfo implements \OCP\Files\FileInfo, \ArrayAccess {
 	private $subMountsUsed = false;
 
 	/**
+	 * The size of the file/folder without any sub mount
+	 *
+	 * @var int
+	 */
+	private $rawSize = 0;
+
+	/**
 	 * @param string|boolean $path
 	 * @param Storage\Storage $storage
 	 * @param string $internalPath
@@ -95,6 +102,7 @@ class FileInfo implements \OCP\Files\FileInfo, \ArrayAccess {
 		$this->data = $data;
 		$this->mount = $mount;
 		$this->owner = $owner;
+		$this->rawSize = $this->data['size'] ?? 0;
 	}
 
 	public function offsetSet($offset, $value) {
@@ -112,11 +120,11 @@ class FileInfo implements \OCP\Files\FileInfo, \ArrayAccess {
 	public function offsetGet($offset) {
 		if ($offset === 'type') {
 			return $this->getType();
-		} else if ($offset === 'etag') {
+		} elseif ($offset === 'etag') {
 			return $this->getEtag();
-		} else if ($offset === 'size') {
+		} elseif ($offset === 'size') {
 			return $this->getSize();
-		} else if ($offset === 'mtime') {
+		} elseif ($offset === 'mtime') {
 			return $this->getMTime();
 		} elseif ($offset === 'permissions') {
 			return $this->getPermissions();
@@ -194,9 +202,13 @@ class FileInfo implements \OCP\Files\FileInfo, \ArrayAccess {
 	/**
 	 * @return int
 	 */
-	public function getSize() {
-		$this->updateEntryfromSubMounts();
-		return isset($this->data['size']) ? 0 + $this->data['size'] : 0;
+	public function getSize($includeMounts = true) {
+		if ($includeMounts) {
+			$this->updateEntryfromSubMounts();
+			return isset($this->data['size']) ? 0 + $this->data['size'] : 0;
+		} else {
+			return $this->rawSize;
+		}
 	}
 
 	/**
@@ -393,5 +405,13 @@ class FileInfo implements \OCP\Files\FileInfo, \ArrayAccess {
 
 	public function getExtension(): string {
 		return pathinfo($this->getName(), PATHINFO_EXTENSION);
+	}
+
+	public function getCreationTime(): int {
+		return (int) $this->data['creation_time'];
+	}
+
+	public function getUploadTime(): int {
+		return (int) $this->data['upload_time'];
 	}
 }

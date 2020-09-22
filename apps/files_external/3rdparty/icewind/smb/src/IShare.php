@@ -52,6 +52,7 @@ interface IShare {
 
 	/**
 	 * Open a writable stream to a remote file
+	 * Note: This method will truncate the file to 0bytes
 	 *
 	 * @param string $target
 	 * @return resource a write only stream to upload a remote file
@@ -60,6 +61,18 @@ interface IShare {
 	 * @throws \Icewind\SMB\Exception\InvalidTypeException
 	 */
 	public function write($target);
+
+	/**
+	 * Open a writable stream to a remote file and set the cursor to the end of the file
+	 *
+	 * @param string $target
+	 * @return resource a write only stream to upload a remote file
+	 *
+	 * @throws \Icewind\SMB\Exception\NotFoundException
+	 * @throws \Icewind\SMB\Exception\InvalidTypeException
+	 * @throws \Icewind\SMB\Exception\InvalidRequestException
+	 */
+	public function append($target);
 
 	/**
 	 * Rename a remote file
@@ -137,4 +150,11 @@ interface IShare {
 	 * @return INotifyHandler
 	 */
 	public function notify($path);
+
+	/**
+	 * Get the IServer instance for this share
+	 *
+	 * @return IServer
+	 */
+	public function getServer(): IServer;
 }

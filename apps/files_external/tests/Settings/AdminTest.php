@@ -3,6 +3,8 @@
  * @copyright Copyright (c) 2016 Lukas Reschke <lukas@statuscode.ch>
  *
  * @author Lukas Reschke <lukas@statuscode.ch>
+ * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -17,7 +19,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,16 +36,16 @@ use Test\TestCase;
 class AdminTest extends TestCase {
 	/** @var Admin */
 	private $admin;
-	/** @var IManager|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IManager|\PHPUnit\Framework\MockObject\MockObject */
 	private $encryptionManager;
-	/** @var GlobalStoragesService|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var GlobalStoragesService|\PHPUnit\Framework\MockObject\MockObject */
 	private $globalStoragesService;
-	/** @var BackendService|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var BackendService|\PHPUnit\Framework\MockObject\MockObject */
 	private $backendService;
-	/** @var GlobalAuth|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var GlobalAuth|\PHPUnit\Framework\MockObject\MockObject */
 	private $globalAuth;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 		$this->encryptionManager = $this->createMock(IManager::class);
 		$this->globalStoragesService = $this->createMock(GlobalStoragesService::class);
@@ -94,7 +96,7 @@ class AdminTest extends TestCase {
 			'storages'             => ['a', 'b', 'c'],
 			'backends'             => ['d', 'e', 'f'],
 			'authMechanisms'       => ['g', 'h', 'i'],
-			'dependencies'         => \OC_Mount_Config::dependencyMessage($this->backendService->getBackends()),
+			'dependencies'         => \OCA\Files_External\MountConfig::dependencyMessage($this->backendService->getBackends()),
 			'allowUserMounting'    => true,
 			'globalCredentials'    => 'asdf:asdf',
 			'globalCredentialsUid' => '',

@@ -58,7 +58,7 @@ class RepairCollationTest extends TestCase {
 	/** @var ILogger */
 	private $logger;
 
-	protected function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->connection = \OC::$server->getDatabaseConnection();
@@ -75,7 +75,7 @@ class RepairCollationTest extends TestCase {
 		$this->repair = new TestCollationRepair($this->config, $this->logger, $this->connection, false);
 	}
 
-	protected function tearDown() {
+	protected function tearDown(): void {
 		$this->connection->getSchemaManager()->dropTable($this->tableName);
 		parent::tearDown();
 	}
@@ -84,7 +84,7 @@ class RepairCollationTest extends TestCase {
 		$tables = $this->repair->getAllNonUTF8BinTables($this->connection);
 		$this->assertGreaterThanOrEqual(1, count($tables));
 
-		/** @var IOutput | \PHPUnit_Framework_MockObject_MockObject $outputMock */
+		/** @var IOutput | \PHPUnit\Framework\MockObject\MockObject $outputMock */
 		$outputMock = $this->getMockBuilder('\OCP\Migration\IOutput')
 			->disableOriginalConstructor()
 			->getMock();

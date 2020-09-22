@@ -25,7 +25,6 @@ use Behat\Behat\Context\Context;
 use Behat\Behat\Hook\Scope\BeforeScenarioScope;
 
 class LoginPageContext implements Context, ActorAwareInterface {
-
 	use ActorAware;
 
 	/**
@@ -58,7 +57,7 @@ class LoginPageContext implements Context, ActorAwareInterface {
 	 * @return Locator
 	 */
 	public static function loginButton() {
-		return Locator::forThe()->id("submit")->
+		return Locator::forThe()->id("submit-form")->
 				describedAs("Login button in Login page");
 	}
 
@@ -66,7 +65,7 @@ class LoginPageContext implements Context, ActorAwareInterface {
 	 * @return Locator
 	 */
 	public static function wrongPasswordMessage() {
-		return Locator::forThe()->xpath("//*[@class = 'warning wrongPasswordMsg' and normalize-space() = 'Wrong password.']")->
+		return Locator::forThe()->xpath("//*[@class = 'warning wrongPasswordMsg' and normalize-space() = 'Wrong username or password.']")->
 				describedAs("Wrong password message in Login page");
 	}
 
@@ -158,5 +157,4 @@ class LoginPageContext implements Context, ActorAwareInterface {
 		$this->iSeeThatTheCurrentPageIsTheLoginPage();
 		$this->iSeeThatAWrongPasswordMessageIsShown();
 	}
-
 }

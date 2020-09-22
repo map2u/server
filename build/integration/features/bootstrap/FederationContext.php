@@ -2,7 +2,10 @@
 /**
  *
  *
+ * @author Bjoern Schiessle <bjoern@schiessle.org>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Joas Schilling <coding@schilljs.com>
+ * @author Robin Appelman <robin@icewind.nl>
  * @author Sergio Bertolin <sbertolin@solidgear.es>
  * @author Sergio Bertolín <sbertolin@solidgear.es>
  *
@@ -19,13 +22,11 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 use Behat\Behat\Context\Context;
 use Behat\Behat\Context\SnippetAcceptingContext;
-use GuzzleHttp\Client;
-use GuzzleHttp\Message\ResponseInterface;
 
 require __DIR__ . '/../../vendor/autoload.php';
 
@@ -33,7 +34,6 @@ require __DIR__ . '/../../vendor/autoload.php';
  * Federation context.
  */
 class FederationContext implements Context, SnippetAcceptingContext {
-
 	use WebDav;
 	use AppConfiguration;
 
@@ -46,8 +46,8 @@ class FederationContext implements Context, SnippetAcceptingContext {
 	 * @param string $shareeUser
 	 * @param string $shareeServer "LOCAL" or "REMOTE"
 	 */
-	public function federateSharing($sharerUser, $sharerServer, $sharerPath, $shareeUser, $shareeServer){
-		if ($shareeServer == "REMOTE"){
+	public function federateSharing($sharerUser, $sharerServer, $sharerPath, $shareeUser, $shareeServer) {
+		if ($shareeServer == "REMOTE") {
 			$shareWith = "$shareeUser@" . substr($this->remoteBaseUrl, 0, -4);
 		} else {
 			$shareWith = "$shareeUser@" . substr($this->localBaseUrl, 0, -4);
@@ -67,8 +67,8 @@ class FederationContext implements Context, SnippetAcceptingContext {
 	 * @param string $shareeUser
 	 * @param string $shareeServer "LOCAL" or "REMOTE"
 	 */
-	public function federateGroupSharing($sharerUser, $sharerServer, $sharerPath, $shareeGroup, $shareeServer){
-		if ($shareeServer == "REMOTE"){
+	public function federateGroupSharing($sharerUser, $sharerServer, $sharerPath, $shareeGroup, $shareeServer) {
+		if ($shareeServer == "REMOTE") {
 			$shareWith = "$shareeGroup@" . substr($this->remoteBaseUrl, 0, -4);
 		} else {
 			$shareWith = "$shareeGroup@" . substr($this->localBaseUrl, 0, -4);
@@ -83,7 +83,7 @@ class FederationContext implements Context, SnippetAcceptingContext {
 	 * @param string $user
 	 * @param string $server
 	 */
-	public function acceptLastPendingShare($user, $server){
+	public function acceptLastPendingShare($user, $server) {
 		$previous = $this->usingServer($server);
 		$this->asAn($user);
 		$this->sendingToWith('GET', "/apps/files_sharing/api/v1/remote_shares/pending", null);
